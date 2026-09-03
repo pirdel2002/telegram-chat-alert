@@ -1,13 +1,13 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "telegram-chat-alert",
-  "main": "src/index.js",
+  "main": "src/multi.js",
   "compatibility_date": "2026-09-02",
   "workers_dev": true,
   "kv_namespaces": [
     {
       "binding": "CONFIG_STORE",
-      "id": "82c151453d2c4142bdf4f584c6bc6f54"
+      "id": "00000000000000000000000000000000"
     }
   ]
 }
