@@ -9,5 +9,12 @@
       "binding": "CONFIG_STORE",
       "id": "82c151453d2c4142bdf4f584c6bc6f54"
     }
+  ],
+  "d1_databases": [
+    {
+      "binding": "MESSAGE_DB",
+      "database_name": "telegram-chat-alert-messages",
+      "database_id": "a1e319cb-fcb2-470c-a84f-9d58c40774f5"
+    }
   ]
 }
