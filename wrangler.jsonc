@@ -4,6 +4,9 @@
   "main": "src/multi.js",
   "compatibility_date": "2026-09-02",
   "workers_dev": true,
+  "vars": {
+    "PUBLIC_BASE_URL": "https://tel.xolox.ir"
+  },
   "routes": [
     {
       "pattern": "tel.xolox.ir",
