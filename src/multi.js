@@ -54,7 +54,7 @@ export default {
 
       if (url.pathname === "/health") {
         const state = await loadState(env);
-        return json({
+        const payload = {
           ok: true,
           version: APP_VERSION,
           runtimeStore: "d1",
@@ -62,7 +62,9 @@ export default {
           enabledBots: state.bots.filter(function (bot) { return bot.enabled; }).length,
           senders: state.senders.length,
           rules: state.bots.reduce(function (count, bot) { return count + bot.rules.length; }, 0),
-        });
+        };
+        if (env.PUBLIC_BASE_URL) payload.webhooks = await ensureCanonicalWebhooks(env, state);
+        return json(payload);
       }
 
       const adminActions = {
@@ -1232,10 +1234,12 @@ function safeAdminReturnPath(value) {
 
 async function ensureCanonicalWebhooks(env, state) {
   const origin = String(env.PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "");
-  if (!origin) return;
+  if (!origin) return null;
   let changed = false;
+  const result = { checked: 0, repaired: 0, failed: 0 };
   await Promise.all(state.bots.map(async function (bot) {
     if (!bot.enabled || !bot.tokenCipher || !bot.webhookSecret) return;
+    result.checked += 1;
     const expectedUrl = origin + "/telegram-webhook/" + bot.id;
     try {
       const token = await decryptSecret(bot.tokenCipher, encryptionSecret(env));
@@ -1247,6 +1251,7 @@ async function ensureCanonicalWebhooks(env, state) {
           allowed_updates: ["business_connection", "business_message", "message"],
           drop_pending_updates: false,
         });
+        result.repaired += 1;
       }
       if (bot.webhookUrl !== expectedUrl) {
         bot.webhookUrl = expectedUrl;
@@ -1254,10 +1259,12 @@ async function ensureCanonicalWebhooks(env, state) {
         changed = true;
       }
     } catch (error) {
+      result.failed += 1;
       console.warn("Could not reconcile bot webhook", bot.id, error);
     }
   }));
   if (changed) await saveState(env, state);
+  return result;
 }
 
 async function telegramApi(token, method, payload) {
