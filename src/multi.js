@@ -48,19 +48,6 @@ export default {
 
       if (url.pathname === "/health") {
         const state = await loadState(env);
-        const messageCount = await env.MESSAGE_DB.prepare("SELECT COUNT(*) AS count FROM messages").first();
-        const sourceCount = await env.MESSAGE_DB.prepare("SELECT COUNT(*) AS count FROM chat_sources").first();
-        const sampleResult = await env.MESSAGE_DB.prepare(
-          "SELECT payload_cipher FROM messages ORDER BY sent_at DESC, id DESC LIMIT 100",
-        ).all();
-        let decryptableMessages = 0;
-        let trackedMessages = 0;
-        for (const row of (sampleResult.results || [])) {
-          const message = await decryptMessagePayload(env, row.payload_cipher);
-          if (!message) continue;
-          decryptableMessages += 1;
-          if (isTrackedChat(message, state.senders)) trackedMessages += 1;
-        }
         return json({
           ok: true,
           version: APP_VERSION,
@@ -69,14 +56,6 @@ export default {
           enabledBots: state.bots.filter(function (bot) { return bot.enabled; }).length,
           senders: state.senders.length,
           rules: state.bots.reduce(function (count, bot) { return count + bot.rules.length; }, 0),
-          messageDiagnostics: {
-            totalRows: Number((messageCount && messageCount.count) || 0),
-            sourceRows: Number((sourceCount && sourceCount.count) || 0),
-            sampledRows: (sampleResult.results || []).length,
-            decryptableRows: decryptableMessages,
-            trackedRows: trackedMessages,
-            encryptionKeySource: env.CONFIG_ENCRYPTION_KEY ? "explicit" : "admin-password",
-          },
         });
       }
 
@@ -136,6 +115,7 @@ async function handleLogin(request, env) {
 
 async function renderAdmin(request, env) {
   const state = await loadState(env);
+  if (env.PUBLIC_BASE_URL) await ensureCanonicalWebhooks(env, state);
   await ensureRuntimeStateMigrated(env, state);
   await migrateKvHistoryToD1(env);
   const url = new URL(request.url);
@@ -1242,6 +1222,36 @@ function isTrackedChat(message, senders) {
 function safeAdminReturnPath(value) {
   if (!value.startsWith("/admin?tab=messages")) return "/admin?tab=messages";
   return value.replace(/[\r\n]/g, "").slice(0, 1800);
+}
+
+async function ensureCanonicalWebhooks(env, state) {
+  const origin = String(env.PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "");
+  if (!origin) return;
+  let changed = false;
+  await Promise.all(state.bots.map(async function (bot) {
+    if (!bot.enabled || !bot.tokenCipher || !bot.webhookSecret) return;
+    const expectedUrl = origin + "/telegram-webhook/" + bot.id;
+    try {
+      const token = await decryptSecret(bot.tokenCipher, encryptionSecret(env));
+      const info = await telegramApi(token, "getWebhookInfo", {});
+      if (String((info && info.url) || "") !== expectedUrl) {
+        await telegramApi(token, "setWebhook", {
+          url: expectedUrl,
+          secret_token: bot.webhookSecret,
+          allowed_updates: ["business_connection", "business_message", "message"],
+          drop_pending_updates: false,
+        });
+      }
+      if (bot.webhookUrl !== expectedUrl) {
+        bot.webhookUrl = expectedUrl;
+        bot.updatedAt = new Date().toISOString();
+        changed = true;
+      }
+    } catch (error) {
+      console.warn("Could not reconcile bot webhook", bot.id, error);
+    }
+  }));
+  if (changed) await saveState(env, state);
 }
 
 async function telegramApi(token, method, payload) {
