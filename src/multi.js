@@ -6,7 +6,7 @@ const STATUS_PREFIX = "telegram-alert:status:v2:";
 const MESSAGE_PREFIX = "telegram-alert:message:v1:";
 const KV_HISTORY_MIGRATION_KEY = "telegram-alert:d1-migration:v1";
 const RUNTIME_MIGRATION_NAME = "runtime-state-from-kv-v1";
-const APP_VERSION = "4.3.0";
+const APP_VERSION = "4.3.1";
 const MESSAGE_PAGE_SIZES = [20, 50, 100];
 const DISPLAY_TIME_ZONE = "Asia/Tehran";
 const SESSION_SECONDS = 12 * 60 * 60;
@@ -16,10 +16,19 @@ const readyDatabases = new WeakSet();
 
 export default {
   async fetch(request, env, ctx) {
+    const requestUrl = new URL(request.url);
+    if (requestUrl.pathname === "/health/runtime") {
+      return json({
+        ok: true,
+        version: APP_VERSION,
+        hostname: requestUrl.hostname,
+        bindingsRequired: false,
+      });
+    }
     try {
       assertBindings(env);
       await ensureMessageDatabase(env);
-      const url = new URL(request.url);
+      const url = requestUrl;
       const webhookMatch = url.pathname.match(/^\/telegram-webhook\/([A-Za-z0-9_-]{4,80})$/);
 
       if (webhookMatch) return await handleTelegramWebhook(request, env, ctx, webhookMatch[1]);

@@ -124,6 +124,14 @@ async function webhook(bot, payload, secret) {
 }
 
 try {
+  const runtimeHealth = await worker.fetch(new Request("https://worker.example/health/runtime"), {}, ctx);
+  assert.deepEqual(await runtimeHealth.json(), {
+    ok: true,
+    version: "4.3.1",
+    hostname: "worker.example",
+    bindingsRequired: false,
+  });
+
   const migrationEnv = {
     CONFIG_STORE: new MemoryKV(),
     MESSAGE_DB: new TestD1(),
@@ -140,7 +148,7 @@ try {
   }));
   const migrationHealth = await worker.fetch(new Request("https://worker.example/health"), migrationEnv, ctx);
   assert.deepEqual(await migrationHealth.json(), {
-    ok: true, version: "4.3.0", runtimeStore: "d1", bots: 1, enabledBots: 1, senders: 0, rules: 0,
+    ok: true, version: "4.3.1", runtimeStore: "d1", bots: 1, enabledBots: 1, senders: 0, rules: 0,
   });
 
   const v2Env = { CONFIG_STORE: new MemoryKV(), MESSAGE_DB: new TestD1(), ADMIN_PASSWORD: env.ADMIN_PASSWORD };
@@ -168,7 +176,7 @@ try {
   }));
   const v2Health = await worker.fetch(new Request("https://worker.example/health"), v2Env, ctx);
   assert.deepEqual(await v2Health.json(), {
-    ok: true, version: "4.3.0", runtimeStore: "d1", bots: 1, enabledBots: 1, senders: 0, rules: 1,
+    ok: true, version: "4.3.1", runtimeStore: "d1", bots: 1, enabledBots: 1, senders: 0, rules: 1,
   });
   const migratedV4 = await v2Env.CONFIG_STORE.get("telegram-alert:state:v4", "json");
   assert.equal(migratedV4.bots[0].rules[0].senderRef, "*");
@@ -650,7 +658,7 @@ try {
 
   const health = await worker.fetch(new Request("https://worker.example/health"), env, ctx);
   assert.deepEqual(await health.json(), {
-    ok: true, version: "4.3.0", runtimeStore: "d1", bots: 2, enabledBots: 2, senders: 4, rules: 3,
+    ok: true, version: "4.3.1", runtimeStore: "d1", bots: 2, enabledBots: 2, senders: 4, rules: 3,
   });
 
   const crossOriginLogin = await worker.fetch(new Request("https://worker.example/login", {
