@@ -6,7 +6,7 @@ const STATUS_PREFIX = "telegram-alert:status:v2:";
 const MESSAGE_PREFIX = "telegram-alert:message:v1:";
 const KV_HISTORY_MIGRATION_KEY = "telegram-alert:d1-migration:v1";
 const RUNTIME_MIGRATION_NAME = "runtime-state-from-kv-v1";
-const APP_VERSION = "4.3.1";
+const APP_VERSION = "4.3.2";
 const MESSAGE_PAGE_SIZES = [20, 50, 100];
 const DISPLAY_TIME_ZONE = "Asia/Tehran";
 const SESSION_SECONDS = 12 * 60 * 60;
@@ -35,7 +35,13 @@ export default {
       if (url.pathname === "/telegram-webhook") return await handleTelegramWebhook(request, env, ctx, "");
 
       if (url.pathname === "/login") {
-        if (request.method === "GET") return html(loginPage());
+        if (request.method === "GET") {
+          if (env.PUBLIC_BASE_URL) {
+            const state = await loadState(env);
+            await ensureCanonicalWebhooks(env, state);
+          }
+          return html(loginPage());
+        }
         if (request.method === "POST") return await handleLogin(request, env);
         return methodNotAllowed();
       }
