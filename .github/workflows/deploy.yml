@@ -55,3 +55,19 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+
+      - name: Capture runtime diagnostics
+        run: |
+          set +e
+          timeout 25s npx wrangler tail telegram-chat-alert-v2 --format=json > tail.log 2>&1 &
+          tail_pid=$!
+          sleep 8
+          curl --max-time 15 -sS https://telegram-chat-alert-v2.helsin.workers.dev/health/runtime || true
+          sleep 5
+          kill "$tail_pid" 2>/dev/null || true
+          wait "$tail_pid" 2>/dev/null || true
+          cat tail.log
+          exit 0
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
