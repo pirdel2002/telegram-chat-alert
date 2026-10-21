@@ -63,7 +63,29 @@ export default {
           senders: state.senders.length,
           rules: state.bots.reduce(function (count, bot) { return count + bot.rules.length; }, 0),
         };
-        if (env.PUBLIC_BASE_URL) payload.webhooks = await ensureCanonicalWebhooks(env, state);
+        if (env.PUBLIC_BASE_URL) {
+          payload.webhooks = await ensureCanonicalWebhooks(env, state);
+          const messageCount = await env.MESSAGE_DB.prepare("SELECT COUNT(*) AS count FROM messages").first();
+          const sourceCount = await env.MESSAGE_DB.prepare("SELECT COUNT(*) AS count FROM chat_sources").first();
+          const sampleResult = await env.MESSAGE_DB.prepare(
+            "SELECT payload_cipher FROM messages ORDER BY sent_at DESC, id DESC LIMIT 100",
+          ).all();
+          let decryptableMessages = 0;
+          let trackedMessages = 0;
+          for (const row of (sampleResult.results || [])) {
+            const message = await decryptMessagePayload(env, row.payload_cipher);
+            if (!message) continue;
+            decryptableMessages += 1;
+            if (isTrackedChat(message, state.senders)) trackedMessages += 1;
+          }
+          payload.messages = {
+            totalRows: Number((messageCount && messageCount.count) || 0),
+            sourceRows: Number((sourceCount && sourceCount.count) || 0),
+            sampledRows: (sampleResult.results || []).length,
+            decryptableRows: decryptableMessages,
+            trackedRows: trackedMessages,
+          };
+        }
         return json(payload);
       }
 
