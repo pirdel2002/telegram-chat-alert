@@ -6,6 +6,10 @@
   "workers_dev": true,
   "routes": [
     {
+      "pattern": "tel.xolox.ir",
+      "custom_domain": true
+    },
+    {
       "pattern": "tel-v2.xolox.ir",
       "custom_domain": true
     }
